@@ -1,0 +1,17 @@
+.ship-piece{
+    background-color: darkslateblue;
+}
+
+.ship-piece-hited{
+    background-color: darkmagenta;
+}
+
+.salvo{
+    /*background-color: crimson;*/
+    background-image: url("http://static.wowhead.com/images/wow/icons/tiny/spell_shaman_firenova.gif");
+}
+
+table{
+background: url("https://cementech.com/wp-content/uploads/2016/03/shining-blue-water-background.jpg");
+}
+
