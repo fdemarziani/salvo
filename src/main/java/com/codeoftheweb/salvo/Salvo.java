@@ -46,7 +46,7 @@ public class Salvo {
         return turn;
     }
 
-    public void setTurn(int turn) {
+    public void setTurn(long turn) {
         this.turn = turn;
     }
 

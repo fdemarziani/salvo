@@ -33,7 +33,10 @@ public class GamePlayer {
     private Date creationDate;
 
     //CONSTRUCTORES
-    public GamePlayer(){}
+    public GamePlayer(){
+        ships = new HashSet<>();
+        salvoes = new HashSet<>();
+    }
 
     public GamePlayer(Game game, Player player){
         this.creationDate = new Date();
@@ -88,7 +91,7 @@ public class GamePlayer {
         this.salvoes = salvoes;
     }
 
-    public GamePlayer getOpponentGamePlayer() {
+    /*public GamePlayer getOpponentGamePlayer() {
         Game game = this.getGame();
         Set<GamePlayer> gamePlayers = game.getGamePlayers();
         for (GamePlayer gp : gamePlayers){
@@ -96,6 +99,9 @@ public class GamePlayer {
                 return gp;
             }
         }
-        return null;
-    }
+        GamePlayer opp = new GamePlayer();
+        return opp;
+    }*/
+
+
 }

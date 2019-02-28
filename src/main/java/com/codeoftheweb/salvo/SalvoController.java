@@ -39,6 +39,10 @@ public class SalvoController {
     @Autowired
     private PlayerRepository playerRepository;
 
+    @Autowired
+    ScoreRepository scoreRepository;
+
+
 
     //////////---------GAMES----------///////////
 
@@ -95,27 +99,23 @@ public class SalvoController {
         //de join game si no se cumplen las condiciones de por sí.
 
         if (authentication.getName().isEmpty()){
-            System.out.println("user empty");
             return new ResponseEntity<>(makeMap("error","Unauthorized"), HttpStatus.UNAUTHORIZED);
         }
 
         Game game = gameRepository.findById(gameid).orElse(null);
         if (game == null) {
-            System.out.println("juego no existe");
             return new ResponseEntity<>(makeMap("error", "No such game"), HttpStatus.FORBIDDEN);
         }
 
         long playersCount = gameRepository.findAll().stream().filter(g -> g.getId() == gameid).count();
         //if(gameRepository.findById(gameid).get().getGamePlayers().size() == 2){
         if(playersCount == 2){
-            System.out.println("ya está lleno");
             return new ResponseEntity<>(makeMap("error", "Game is full"), HttpStatus.FORBIDDEN);
         }
 
 
         GamePlayer newGP = gamePlayerRepository.save(new GamePlayer(gameRepository.findById(gameid).get(),
                 playerRepository.findByUserName(authentication.getName())));
-        System.out.println("juego joineado");
 
         return new ResponseEntity<>(makeMap("gpid", newGP.getId()), HttpStatus.CREATED);
 
@@ -200,7 +200,7 @@ public class SalvoController {
     }
 
     @RequestMapping("/game_view/{gpid}")
-    public ResponseEntity<Object> cheat(@PathVariable long gpid, Authentication authentication) {
+    public ResponseEntity<Object> gameView(@PathVariable long gpid, Authentication authentication) {
         Player player = getLoggedPlayer(authentication);
         GamePlayer gamePlayer = gamePlayerRepository.findById(gpid).orElse(null);
         if (gamePlayer == null) {
@@ -211,14 +211,17 @@ public class SalvoController {
             return new ResponseEntity<>(makeMap("error", "Unauthorized"), HttpStatus.UNAUTHORIZED);
         }
 
+        GamePlayer opponentGP = gamePlayer.getGame().getGamePlayers().stream().filter(gpo -> gpo.getId() != gpid).findFirst().orElse(new GamePlayer());
+        GamePlayer opponentGamePlayer = opponentGP;
+
         Map<String, Object> dto = new LinkedHashMap<>();
         dto.put("id", gamePlayer.getGame().getId());
         dto.put("creationDate", gamePlayer.getGame().getCreationDate().getTime());
-        dto.put("gameState", getGameState1(gamePlayer, gamePlayer.getOpponentGamePlayer()));
+        dto.put("gameState", getGameState(gamePlayer, opponentGamePlayer));
         dto.put("gamePlayers", getAllGamePlayers(gamePlayer.getGame().getGamePlayers()));
         dto.put("ships", getAllShips(gamePlayer.getShips()));
         dto.put("salvoes", getSalvoList(gamePlayer.getGame()));
-        dto.put("hits", selfAndOpponent(gamePlayer, gamePlayer.getOpponentGamePlayer()));
+        dto.put("hits", selfAndOpponent(gamePlayer, opponentGamePlayer));
 
         return new ResponseEntity<>(dto, HttpStatus.OK);
     }
@@ -275,27 +278,24 @@ public class SalvoController {
         //si no existe el gpID
         GamePlayer gamePlayer = gamePlayerRepository.findById(gamePlayerID).orElse(null);
         if (gamePlayer == null){
-            System.out.println("no existe gp");
             return new ResponseEntity<>(makeMap("error", "The ID doesn't exist"), HttpStatus.UNAUTHORIZED);
         }
 
         //si no coincide el id con el gamePlayer
         Player player = getLoggedPlayer(authentication);
         if(player.getId() != gamePlayer.getPlayer().getId()){
-            System.out.println("no coincide gp");
             return new ResponseEntity<>(makeMap("error", "You shouldn't do this"), HttpStatus.UNAUTHORIZED);
         }
 
         if(gamePlayer.getShips().isEmpty()){
-            System.out.println("crea ships");
             for(Ship ship : ships){
                 ship.setGamePlayer(gamePlayer);
+                shipRepository.save(ship);
             }
-            shipRepository.saveAll(ships);
+            //shipRepository.saveAll(ships);
             return new ResponseEntity<>(makeMap("yay", "Ships located!"), HttpStatus.CREATED);
         } else {
             //si el player ya seteó sus ships
-            System.out.println("ya había puesto los ships");
             return new ResponseEntity<>(makeMap("error", "Ships have already been located"), HttpStatus.FORBIDDEN);
         }
 
@@ -328,18 +328,19 @@ public class SalvoController {
             return new ResponseEntity<>(makeMap("error", "You shouldn't do this"), HttpStatus.UNAUTHORIZED);
         }
 
+
         List<Salvo> salvos = salvoRepository.findByTurn(salvo.getTurn()); //todos los salvos con ese turno
         long gpCount = salvos.stream().filter(s -> s.getGamePlayer().getId() == gamePlayerID).count(); //se fija si coincide el gpID con alguno que ya haya disparado
 
         //se dispara el salvo
         if (salvos.isEmpty() || gpCount == 0) { //si todavía ese gameplayer no disparó en ese turno, dispara
             salvo.setGamePlayer(gamePlayer);
+            salvo.setTurn(gamePlayer.getSalvoes().size()+1);
             salvoRepository.save(salvo);
             return new ResponseEntity<>(makeMap("Done", "Salvo fired"), HttpStatus.CREATED);
         } else {
             //si el jugador ya disparó en este turno
             return new ResponseEntity<>(makeMap("error", "Your turn has passed"), HttpStatus.FORBIDDEN);
-
         }
     }
 
@@ -365,7 +366,7 @@ public class SalvoController {
         return dto;
     }
 
-    ////////-------AUXILIARES-------////////
+    ////////-------HITS-------////////
 
     private Map<String, Object> selfAndOpponent(GamePlayer gamePlayer, GamePlayer opponentGamePlayer){
         Map<String, Object> dtoSelfAndOpponent = new LinkedHashMap<>();
@@ -390,7 +391,6 @@ public class SalvoController {
         if (gamePlayer.getShips().isEmpty()){
             return hits;
         }
-        System.out.println(gamePlayer.getShips());
             gamePlayer.getShips().forEach(ship -> {
                 switch (ship.getType()) {
                     case "carrier":
@@ -484,6 +484,9 @@ public class SalvoController {
 
     }
 
+    ////////-------GAME-STATE-------////////
+
+
     private int getCurrentTurn(GamePlayer selfGP, GamePlayer opponentGP){
         int selfGPSalvoes = selfGP.getSalvoes().size();
         int opponentGPSalvoes = opponentGP.getSalvoes().size();
@@ -494,112 +497,6 @@ public class SalvoController {
             return totalSalvoes / 2 + 1;
 
         return (int) (totalSalvoes / 2.0 + 0.5);
-    }
-
-    private String getGameState1(GamePlayer selfGP, GamePlayer opponentGP) {
-        Set<Ship> selfShips = selfGP.getShips();
-        Set<Salvo> selfSalvoes = selfGP.getSalvoes();
-        if (selfShips.size() == 0){
-            return "PLACESHIPS";
-        }
-        if (opponentGP.getShips() == null){
-            return "WAITINGFOROPP";
-        }
-        int turn = getCurrentTurn(selfGP, opponentGP);
-        Set<Ship> opponentShips = opponentGP.getShips();
-        Set<Salvo> opponentSalvoes = opponentGP.getSalvoes();
-        if (opponentShips.size() == 0){
-            return "WAIT";
-        }
-        if(selfSalvoes.size() == opponentSalvoes.size()){
-            Player self = selfGP.getPlayer();
-            Game game = selfGP.getGame();
-            if (allShipsSunk(selfGP, opponentGP) && allShipsSunk(opponentGP, selfGP)){
-                Score score = new Score(game, self, 0.5f, new Date());
-                if(!existScore(score, game)) {
-                    scoreRepository.save(score);
-                }
-                return "TIE";
-            }
-            if (allShipsSunk(selfGP, opponentGP)){
-                Score score = new Score(game, self, 0, new Date());
-                if(!existScore(score, game)) {
-                    scoreRepository.save(score);
-                }
-                return "LOST";
-            }
-            if(allShipsSunk(opponentGP, selfGP)){
-                Score score = new Score(game, self, 1, new Date());
-                if(!existScore(score, game)) {
-                    scoreRepository.save(score);
-                }
-                return "WON";
-            }
-        }
-        if (selfSalvoes.size() != turn){
-            return "PLAY";
-        }
-        return "WAIT";
-    }
-
-    private boolean existScore(Score score, Game game){
-        return game.getScores().contains(score);
-    }
-
-    @Autowired
-    ScoreRepository scoreRepository;
-
-    private String getGameState (GamePlayer gamePlayer, GamePlayer opponent) {
-        Set<Ship> selfShips = gamePlayer.getShips();
-        Set<Salvo> selfSalvoes = gamePlayer.getSalvoes();
-        if (selfShips.size() == 0) {
-            return "PLACESHIPS";
-        }
-
-        if (opponent.getShips() == null) {
-            System.out.println("jeja");
-            return "WAITINGFOROPP";
-        }
-
-        //int turn = getCurrentTurn(gamePlayer, opponent);
-        Set<Ship> opponentShips = opponent.getShips();
-        Set<Salvo> opponentSalvoes = opponent.getSalvoes();
-        Player self = gamePlayer.getPlayer();
-        Game game = gamePlayer.getGame();
-        if (opponentShips.size() == 0){
-            return "WAIT";
-        }
-
-        if (gamePlayer.getSalvoes().isEmpty() && !gamePlayer.getOpponentGamePlayer().getShips().isEmpty()) {
-            return "PLAY";
-        }
-
-        while(!isGameOver(gamePlayer, gamePlayer.getOpponentGamePlayer())){
-            if (gamePlayer.getSalvoes().size() > gamePlayer.getOpponentGamePlayer().getSalvoes().size()) {
-                return "WAIT";
-            }
-
-            if (gamePlayer.getSalvoes().size() < gamePlayer.getOpponentGamePlayer().getSalvoes().size()) {
-                return "PLAY";
-            }
-
-        }
-
-        if (allShipsSunk(gamePlayer.getOpponentGamePlayer(), gamePlayer) && allShipsSunk(gamePlayer, gamePlayer.getOpponentGamePlayer())) {
-            Score score = new Score(game, self, 0.5, new Date());
-            return "TIE";
-        } else if (allShipsSunk(gamePlayer, gamePlayer.getOpponentGamePlayer())) {
-            Score score = new Score(game, self, 0, new Date());
-            return "LOST";
-        } else {
-            Score score = new Score(game, self, 1, new Date());
-            return "WON";
-        }
-
-    }
-
-    private boolean isGameOver(GamePlayer gamePlayer, GamePlayer opponentGameplayer){
-        return allShipsSunk(gamePlayer, opponentGameplayer) || allShipsSunk(opponentGameplayer, gamePlayer);
     }
 
     private boolean allShipsSunk(GamePlayer gamePlayer, GamePlayer opponentGameplayer) {
@@ -682,6 +579,67 @@ public class SalvoController {
 
         return carrierSunk && battleshipSunk && submarineSunk && destroyerSunk && patrolboatSunk;
 
+    }
+
+
+    private boolean existScore(Score score, Game game){
+        List<Score> scores = game.getScores();
+        for(Score s : scores){
+            if(score.getPlayer().getUserName().equals(s.getPlayer().getUserName())){
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    private String getGameState (GamePlayer gamePlayer, GamePlayer opponent) {
+        Set<Ship> selfShips = gamePlayer.getShips();
+        Set<Salvo> selfSalvoes = gamePlayer.getSalvoes();
+        if (selfShips.size() == 0) {
+            return "PLACESHIPS";
+        }
+
+        if (opponent.getShips() == null){
+            return "WAITINGFOROPP";
+        }
+
+        if (opponent.getShips().isEmpty()) {
+            return "WAIT";
+        }
+
+        int turn = getCurrentTurn(gamePlayer, opponent);
+        Set<Salvo> opponentSalvoes = opponent.getSalvoes();
+        Player self = gamePlayer.getPlayer();
+        Game game = gamePlayer.getGame();
+
+        if (selfSalvoes.size() == opponentSalvoes.size()) {
+            if (allShipsSunk(gamePlayer, opponent) && allShipsSunk(opponent, gamePlayer)) {
+                Score score = new Score(game, self, 0.5, new Date());
+                if (!existScore(score, game)) {
+                    scoreRepository.save(score);
+                }
+                return "TIE";
+            }
+            if (allShipsSunk(gamePlayer, opponent)) {
+                Score score = new Score(game, self, 0, new Date());
+                if (!existScore(score, game)) {
+                    scoreRepository.save(score);
+                }
+                return "LOST";
+            }
+            if (allShipsSunk(opponent, gamePlayer)) {
+                Score score = new Score(game, self, 1, new Date());
+                if (!existScore(score, game)) {
+                    scoreRepository.save(score);
+                }
+                return "WON";
+            }
+        }
+        if (selfSalvoes.size() != turn) {
+            return "PLAY";
+        }
+        return "WAIT";
     }
 
 }

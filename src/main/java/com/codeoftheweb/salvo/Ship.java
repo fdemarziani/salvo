@@ -54,7 +54,7 @@ public class Ship {
         return locations;
     }
 
-    public void setLocationList(List<String> locations) {
+    public void setLocations(List<String> locations) {
         this.locations = locations;
     }
 

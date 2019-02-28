@@ -8,7 +8,6 @@ var youID = "";
 var salvoJSON;
 var salvoPositions = [];
 var waitState = false;
-//postSalvo(makePostUrlSalvoes());
 
 refreshGameView(makeUrl());
 
@@ -50,7 +49,7 @@ function makePostUrl() {
 }
 
 function makePostUrlSalvoes() {
-    var gamePlayerID =  getParameterByName("gp"); //gp
+    var gamePlayerID =  getParameterByName("gp");
     return '/api/games/players/' + gamePlayerID + '/salvoes';
 }
 
@@ -75,12 +74,10 @@ function refreshGameView(_url) {
                 makeGameRecordTable(gamePlayerData.hits.opponent, "gameRecordOppTable");
                 makeGameRecordTable(gamePlayerData.hits.self, "gameRecordSelfTable");
             }
-
             if (gamePlayerData.gameState === "PLACESHIPS"){
                 $('#placingShipsBoard').show('puff', 'slow');
             }
             if (gamePlayerData.gameState === "WAITINGFOROPP"){
-                console.log("adasdsd")
                 $('#battleGrids').show('puff', 'slow');
             }
 
@@ -170,7 +167,7 @@ function showSelf (gamePlayerData) {
     youID = "";
 
     gamePlayerData.gamePlayers.forEach(function(gamePlayer) {
-        if (gamePlayer.id == getParameterByName("gp")) {
+        if (gamePlayer.gpid == getParameterByName("gp")) {
             you = gamePlayer.player.userName; //email
             youID = gamePlayer.player.id;
         } else {
@@ -294,7 +291,6 @@ function postShipLocations (postUrl) {
     $.post({
         url: postUrl,
         data: shipsJSON,
-        //data: JSON.stringify([{type: "destroyer", locations: ["A1", "A2", "A3"]}]),
         dataType: "text",
         contentType: "application/json"
     })
@@ -322,7 +318,6 @@ function postSalvo (postUrl) {
     $.post({
         url: postUrl,
         data: salvoJSON,
-        //data: JSON.stringify({turn: 3, locations: ["A1", "A2", "A3"]}),
         dataType: "text",
         contentType: "application/json"
     })
@@ -389,7 +384,7 @@ function makeSalvoJSON() {
         salvoPositions.push(salvo5cellID);
     }
     salvoObject = {
-        salvoLocations : salvoPositions
+       locations : salvoPositions
     }
 
     salvoJSON = JSON.stringify(salvoObject);
