@@ -91,17 +91,4 @@ public class GamePlayer {
         this.salvoes = salvoes;
     }
 
-    /*public GamePlayer getOpponentGamePlayer() {
-        Game game = this.getGame();
-        Set<GamePlayer> gamePlayers = game.getGamePlayers();
-        for (GamePlayer gp : gamePlayers){
-            if(gp.getId() != this.getId()){
-                return gp;
-            }
-        }
-        GamePlayer opp = new GamePlayer();
-        return opp;
-    }*/
-
-
 }

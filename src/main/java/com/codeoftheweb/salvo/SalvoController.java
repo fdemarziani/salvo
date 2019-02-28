@@ -40,7 +40,7 @@ public class SalvoController {
     private PlayerRepository playerRepository;
 
     @Autowired
-    ScoreRepository scoreRepository;
+    private ScoreRepository scoreRepository;
 
 
 
@@ -93,10 +93,6 @@ public class SalvoController {
 
     @RequestMapping(path = "/game/{gameid}/players", method = RequestMethod.POST)
     public ResponseEntity<Map<String,Object>> joinGame(Authentication authentication, @PathVariable long gameid){
-
-        //quise poner prints para ver si llegaba correctamente, y pasa lo que tiene que pasar pero no se ven los prints
-        //(excepto el último). creo que es porque en el js se pregunta cada caso y no me puede aparecer la opción
-        //de join game si no se cumplen las condiciones de por sí.
 
         if (authentication.getName().isEmpty()){
             return new ResponseEntity<>(makeMap("error","Unauthorized"), HttpStatus.UNAUTHORIZED);
